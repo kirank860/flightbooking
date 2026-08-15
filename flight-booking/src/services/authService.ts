@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import pool from '../config/database';
 
 interface TokenPayload {
@@ -48,11 +48,11 @@ export class AuthService {
 
     const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {
       expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m',
-    });
+    } as SignOptions);
 
     const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET!, {
       expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '7d',
-    });
+    } as SignOptions);
 
     return { accessToken, refreshToken, user };
   }

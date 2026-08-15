@@ -36,7 +36,7 @@ router.get('/my-bookings', authMiddleware, async (req: AuthRequest, res: Respons
 
 router.post('/:id/cancel', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const bookingId = parseInt(req.params.id);
+    const bookingId = parseInt(req.params.id as string);
     const result = await bookingService.cancelBooking(bookingId, req.user!.userId);
     res.json({ message: 'Booking cancelled', booking: result });
   } catch (error: any) {

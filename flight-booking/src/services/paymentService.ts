@@ -5,6 +5,7 @@ export class PaymentService {
     // Mock Stripe payment intent creation
     const paymentIntent = {
       id: `pi_mock_${Math.random().toString(36).substr(2, 9)}`,
+      client_secret: `pi_mock_${Math.random().toString(36).substr(2, 9)}_secret`,
       amount: Math.round(amount * 100),
       currency: 'usd',
       metadata: { bookingId },

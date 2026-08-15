@@ -23,7 +23,7 @@ router.get('/search', async (req: Request, res: Response) => {
 
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const result = await flightService.getFlightById(parseInt(req.params.id));
+    const result = await flightService.getFlightById(parseInt(req.params.id as string));
     if (!result) return res.status(404).json({ error: 'Flight not found' });
     res.json(result);
   } catch (error: any) {
