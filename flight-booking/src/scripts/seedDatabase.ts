@@ -2,6 +2,120 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import bcrypt from 'bcrypt';
 
+interface RouteDef {
+  origin: string;
+  destination: string;
+  airlines: string[];
+  basePrice: number;
+  durationMins: number;
+}
+
+// Realistic long-haul/regional network anchored on a few major hubs.
+// Return legs are listed separately since price/duration/airline mix isn't symmetric in practice.
+const ROUTES: RouteDef[] = [
+  { origin: 'DXB', destination: 'JFK', airlines: ['Emirates', 'Qatar Airways'], basePrice: 1150, durationMins: 840 },
+  { origin: 'JFK', destination: 'DXB', airlines: ['Emirates', 'Etihad Airways'], basePrice: 1180, durationMins: 780 },
+  { origin: 'DXB', destination: 'LHR', airlines: ['Etihad Airways', 'British Airways'], basePrice: 780, durationMins: 435 },
+  { origin: 'LHR', destination: 'DXB', airlines: ['British Airways', 'Emirates'], basePrice: 820, durationMins: 405 },
+  { origin: 'DXB', destination: 'MLE', airlines: ['FlyDubai', 'Emirates'], basePrice: 560, durationMins: 270 },
+  { origin: 'MLE', destination: 'DXB', airlines: ['FlyDubai'], basePrice: 590, durationMins: 255 },
+  { origin: 'DXB', destination: 'SIN', airlines: ['Singapore Airlines', 'Emirates'], basePrice: 690, durationMins: 465 },
+  { origin: 'SIN', destination: 'DXB', airlines: ['Singapore Airlines'], basePrice: 710, durationMins: 450 },
+  { origin: 'DXB', destination: 'BOM', airlines: ['Emirates', 'Air India'], basePrice: 320, durationMins: 195 },
+  { origin: 'BOM', destination: 'DXB', airlines: ['Emirates'], basePrice: 340, durationMins: 180 },
+  { origin: 'DXB', destination: 'CDG', airlines: ['Air France', 'Emirates'], basePrice: 720, durationMins: 420 },
+  { origin: 'CDG', destination: 'DXB', airlines: ['Air France'], basePrice: 750, durationMins: 390 },
+  { origin: 'LHR', destination: 'JFK', airlines: ['British Airways', 'Delta Airlines'], basePrice: 640, durationMins: 495 },
+  { origin: 'JFK', destination: 'LHR', airlines: ['British Airways', 'Delta Airlines'], basePrice: 660, durationMins: 420 },
+  { origin: 'LHR', destination: 'LAX', airlines: ['British Airways'], basePrice: 890, durationMins: 660 },
+  { origin: 'LAX', destination: 'LHR', airlines: ['British Airways'], basePrice: 910, durationMins: 615 },
+  { origin: 'JFK', destination: 'LAX', airlines: ['Delta Airlines', 'American Airlines'], basePrice: 280, durationMins: 360 },
+  { origin: 'LAX', destination: 'JFK', airlines: ['Delta Airlines', 'American Airlines'], basePrice: 300, durationMins: 315 },
+];
+
+// Departure dates each route is offered on, relative to a fixed near-future anchor.
+const DAY_OFFSETS = [3, 10, 17, 24, 38, 52];
+const ANCHOR = new Date('2026-09-01T00:00:00Z');
+
+function isoDate(offsetDays: number): string {
+  const d = new Date(ANCHOR);
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+
+function hhmm(totalMins: number): string {
+  const h = Math.floor(totalMins / 60) % 24;
+  const m = totalMins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// Deterministic pseudo-random in [0,1) seeded by a string, so re-running the seed produces the same data.
+function seededRandom(seed: string): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  }
+  return (Math.abs(hash) % 1000) / 1000;
+}
+
+interface FlightRow {
+  airline: string;
+  origin: string;
+  destination: string;
+  departure_date: string;
+  departure_time: string;
+  arrival_time: string;
+  price: number;
+  total_seats: number;
+  seats_available: number;
+}
+
+function buildFlights(): FlightRow[] {
+  const flights: FlightRow[] = [];
+
+  for (const route of ROUTES) {
+    DAY_OFFSETS.forEach((offset, dateIdx) => {
+      route.airlines.forEach((airline, airlineIdx) => {
+        const seed = `${route.origin}${route.destination}${airline}${offset}`;
+        const rand = seededRandom(seed);
+
+        const departureMins = 240 + ((dateIdx * 3 + airlineIdx * 5) % 18) * 55; // spread across the day, 04:00-21:00
+        const arrivalMins = departureMins + route.durationMins;
+
+        const priceJitter = Math.round((rand - 0.5) * 120); // +/- ~60 around base price
+        const price = Math.max(59, route.basePrice + priceJitter);
+
+        const totalSeats = [150, 180, 220, 250, 300][Math.floor(rand * 5)] ?? 200;
+
+        // Most flights are comfortably open; a few are nearly sold out or fully booked
+        // so the search/results UI has realistic edge cases to render.
+        let seatsAvailable: number;
+        if (rand < 0.08) {
+          seatsAvailable = 0;
+        } else if (rand < 0.18) {
+          seatsAvailable = Math.floor(rand * 5) + 1; // 1-5 seats left
+        } else {
+          seatsAvailable = Math.round(totalSeats * (0.35 + rand * 0.6));
+        }
+
+        flights.push({
+          airline,
+          origin: route.origin,
+          destination: route.destination,
+          departure_date: isoDate(offset),
+          departure_time: hhmm(departureMins),
+          arrival_time: hhmm(arrivalMins),
+          price,
+          total_seats: totalSeats,
+          seats_available: Math.min(seatsAvailable, totalSeats),
+        });
+      });
+    });
+  }
+
+  return flights;
+}
+
 const dbPath = path.resolve(__dirname, '../../database.sqlite');
 const db = new sqlite3.Database(dbPath, async (err) => {
   if (err) {
@@ -102,27 +216,19 @@ const db = new sqlite3.Database(dbPath, async (err) => {
         ['admin@example.com', hashedAdminPass, 'admin']
       );
 
-      // Insert dummy flights
-      const flights = [
-        ['Emirates', 'DXB', 'JFK', '2026-10-15', '08:00', '14:00', 1200.00, 300, 300],
-        ['Qatar Airways', 'DXB', 'JFK', '2026-10-15', '10:30', '16:45', 1150.00, 250, 200],
-        ['Etihad Airways', 'DXB', 'LHR', '2026-10-16', '02:00', '06:30', 800.00, 200, 150],
-        ['British Airways', 'LHR', 'DXB', '2026-10-20', '14:00', '23:55', 850.00, 200, 50],
-        ['Delta Airlines', 'JFK', 'LAX', '2026-11-01', '09:00', '12:00', 300.00, 150, 150],
-        ['FlyDubai', 'DXB', 'MLE', '2026-12-01', '10:00', '15:00', 600.00, 180, 10],
-      ];
+      const flights = buildFlights();
 
-      flights.forEach(f => {
+      flights.forEach((f) => {
         db.run(
           `INSERT INTO flights (airline, origin, destination, departure_date, departure_time, arrival_time, price, total_seats, seats_available) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          f
+          [f.airline, f.origin, f.destination, f.departure_date, f.departure_time, f.arrival_time, f.price, f.total_seats, f.seats_available]
         );
       });
 
       setTimeout(() => {
-        console.log('Database seeded successfully!');
+        console.log(`Database seeded successfully with ${flights.length} flights across ${ROUTES.length} routes!`);
         console.log('You can login with: test@example.com / password123');
-        console.log('Try searching flights from DXB to JFK on 2026-10-15');
+        console.log(`Try searching flights from DXB to JFK on ${isoDate(DAY_OFFSETS[0]!)}`);
         db.close();
       }, 1000);
     });
