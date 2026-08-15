@@ -29,7 +29,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (!refreshToken) return;
 
     try {
-      const res = await fetch('http://localhost:5000/auth/refresh', {
+      const res = await fetch('http://localhost:5001/auth/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
