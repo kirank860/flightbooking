@@ -6,15 +6,21 @@ import flightRoutes from './routes/flights';
 import bookingRoutes from './routes/bookings';
 import paymentRoutes from './routes/payment';
 import adminRoutes from './routes/admin';
+import { stripeWebhookHandler } from './webhooks/stripeWebhook';
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5001;
 
+app.use(cors());
+
+// Stripe signature verification needs the raw request body, so this must be
+// registered before the global express.json() parser below.
+app.post('/payments/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
+
 // Middleware
 app.use(express.json());
-app.use(cors());
 
 // Routes
 app.use('/auth', authRoutes);

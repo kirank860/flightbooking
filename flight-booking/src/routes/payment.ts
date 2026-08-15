@@ -20,6 +20,7 @@ router.post('/create-intent', authMiddleware, async (req: AuthRequest, res: Resp
 
     const paymentIntent = await paymentService.createPaymentIntent(
       bookingId,
+      req.user!.userId,
       booking.rows[0].total_price,
       req.user!.email
     );
@@ -32,8 +33,8 @@ router.post('/create-intent', authMiddleware, async (req: AuthRequest, res: Resp
 
 router.post('/confirm', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { bookingId } = req.body;
-    const booking = await paymentService.confirmPayment(bookingId, req.user!.userId);
+    const { bookingId, paymentIntentId } = req.body;
+    const booking = await paymentService.confirmPayment(bookingId, req.user!.userId, paymentIntentId);
     res.json(booking);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
