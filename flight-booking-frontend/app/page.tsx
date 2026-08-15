@@ -3,10 +3,27 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Pill from './components/Pill';
+import HeroSlider from './components/HeroSlider';
 import apiClient from './lib/apiClient';
+
+const HERO_SLIDES = [
+  { src: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1600&q=80&auto=format&fit=crop', alt: 'Aeroplane wing above the clouds at sunset' },
+  { src: 'https://images.unsplash.com/photo-1569154941061-e231b4725ef1?w=1600&q=80&auto=format&fit=crop', alt: 'Aeroplane parked at an airport terminal' },
+  { src: 'https://images.unsplash.com/photo-1530521954074-e64f6810b32d?w=1600&q=80&auto=format&fit=crop', alt: 'Traveller at the gate watching a plane take off' },
+];
+
+const DESTINATION_IMAGES: Record<string, string> = {
+  LAX: 'https://images.unsplash.com/photo-1444723121867-7a241cacace9?w=800&q=80&auto=format&fit=crop',
+  MLE: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=800&q=80&auto=format&fit=crop',
+  LHR: 'https://images.unsplash.com/photo-1533929736458-ca588d08c8be?w=800&q=80&auto=format&fit=crop',
+  DXB: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=800&q=80&auto=format&fit=crop',
+  JFK: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=800&q=80&auto=format&fit=crop',
+};
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800&q=80&auto=format&fit=crop';
 
 interface Flight {
   id: number;
@@ -80,13 +97,13 @@ export default function Home() {
       <main className="flex-1">
         {/* Hero */}
         <section className="px-3 sm:px-5 lg:px-7 pt-3 sm:pt-5">
-          <div className="relative rounded-[clamp(18px,2.4vw,28px)] overflow-hidden min-h-[clamp(400px,58vh,620px)] flex items-end placeholder-fill">
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(18,22,24,0.42) 0%, rgba(18,22,24,0.08) 42%, rgba(18,22,24,0.72) 100%)' }} />
+          <div className="relative rounded-[clamp(18px,2.4vw,28px)] overflow-hidden min-h-[clamp(400px,58vh,620px)] flex items-end">
+            <HeroSlider slides={HERO_SLIDES} />
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
-              className="relative p-6 sm:p-10 lg:p-14 max-w-6xl mx-auto w-full text-page"
+              className="relative z-10 p-6 sm:p-10 lg:p-14 max-w-6xl mx-auto w-full text-page"
             >
               <p className="text-[13px] tracking-[0.16em] uppercase text-page/78 mb-4">Fly with room to breathe</p>
               <h1 className="font-serif font-normal text-[clamp(38px,7vw,80px)] leading-[1.02] tracking-[-0.02em] max-w-[15ch] text-balance">
@@ -196,8 +213,14 @@ export default function Home() {
                   onClick={() => searchRoute(d.origin, d.destination, d.departure_date)}
                   className="border border-border rounded-2xl overflow-hidden bg-surface cursor-pointer hover:border-[#C9C1B4] transition-colors"
                 >
-                  <div className="h-[150px] placeholder-fill flex items-center justify-center">
-                    <span className="font-mono text-[11px] text-[#8A8378] tracking-[0.06em]">{d.origin} → {d.destination}</span>
+                  <div className="relative h-[150px]">
+                    <Image
+                      src={DESTINATION_IMAGES[d.destination] || FALLBACK_IMAGE}
+                      alt={`${d.destination} skyline`}
+                      fill
+                      sizes="(max-width: 640px) 100vw, 25vw"
+                      className="object-cover"
+                    />
                   </div>
                   <div className="px-[18px] pt-4 pb-[18px]">
                     <div className="text-[17px] mb-1">{d.destination}</div>
