@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import Header from '../components/Header';
 import { useAuthStore } from '../store/authStore';
 import apiClient from '../lib/apiClient';
@@ -9,6 +10,8 @@ import apiClient from '../lib/apiClient';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect') || '/';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailTouched, setEmailTouched] = useState(false);
@@ -33,7 +36,7 @@ export default function LoginPage() {
     try {
       const { data } = await apiClient.post('/auth/login', { email, password });
       setAuth(data.user, data.accessToken, data.refreshToken);
-      window.location.href = '/';
+      window.location.href = redirect;
     } catch (err: any) {
       if (err.response?.status === 401) {
         setCredentialsError('That email and password don’t match. Double-check your password and try again.');

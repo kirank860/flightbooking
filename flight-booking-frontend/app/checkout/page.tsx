@@ -7,6 +7,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import StepProgress from '../components/StepProgress';
 import apiClient from '../lib/apiClient';
+import { useAuthStore } from '../store/authStore';
 
 interface Flight {
   id: number;
@@ -42,6 +43,14 @@ export default function CheckoutPage() {
   const searchParams = useSearchParams();
   const flightId = searchParams.get('flightId');
   const passengerCount = parseInt(searchParams.get('passengerCount') || '1');
+  const { user, initializing } = useAuthStore();
+
+  useEffect(() => {
+    if (!initializing && !user) {
+      const redirect = `/checkout?flightId=${flightId}&passengerCount=${passengerCount}`;
+      router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
+    }
+  }, [initializing, user, router, flightId, passengerCount]);
 
   const [flight, setFlight] = useState<Flight | null>(null);
   const [step, setStep] = useState(1);
@@ -118,11 +127,13 @@ export default function CheckoutPage() {
     }
   };
 
-  if (!flight) {
+  if (initializing || !user || !flight) {
     return (
       <div className="min-h-screen flex flex-col bg-page">
         <Header />
-        <main className="flex-1 flex items-center justify-center text-ink-muted">{error || 'Loading…'}</main>
+        <main className="flex-1 flex items-center justify-center text-ink-muted">
+          {!initializing && !user ? 'Redirecting to sign in…' : error || 'Loading…'}
+        </main>
         <Footer />
       </div>
     );
