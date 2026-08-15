@@ -4,15 +4,18 @@ interface AuthStore {
   user: any;
   accessToken: string | null;
   refreshToken: string | null;
+  initializing: boolean;
   setAuth: (user: any, accessToken: string, refreshToken: string) => void;
   logout: () => void;
   refreshAccessToken: () => Promise<void>;
+  bootstrap: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   accessToken: null,
   refreshToken: null,
+  initializing: true,
 
   setAuth: (user, accessToken, refreshToken) => {
     localStorage.setItem('refreshToken', refreshToken);
@@ -29,7 +32,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (!refreshToken) return;
 
     try {
-      const res = await fetch('http://localhost:5001/auth/refresh', {
+      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001') + '/auth/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
@@ -37,9 +40,18 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       if (!res.ok) throw new Error('Refresh failed');
       const data = await res.json();
-      set({ accessToken: data.accessToken });
+      localStorage.setItem('refreshToken', data.refreshToken);
+      set({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user });
     } catch (error) {
       get().logout();
     }
+  },
+
+  bootstrap: async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (refreshToken) {
+      await get().refreshAccessToken();
+    }
+    set({ initializing: false });
   },
 }));

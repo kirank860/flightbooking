@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Instrument_Serif, Public_Sans } from "next/font/google";
 import "./globals.css";
+import AuthBootstrap from "./components/AuthBootstrap";
 
 const instrumentSerif = Instrument_Serif({
   variable: "--font-instrument-serif",
@@ -27,7 +28,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${instrumentSerif.variable} ${publicSans.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-page text-ink">{children}</body>
+      <body className="min-h-full flex flex-col bg-page text-ink">
+        <AuthBootstrap />
+        {children}
+      </body>
     </html>
   );
 }
