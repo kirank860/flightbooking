@@ -35,7 +35,8 @@ export class AuthService {
       throw new Error('Invalid credentials');
     }
 
-    return this.generateTokens(user);
+    const { password_hash, ...safeUser } = user;
+    return this.generateTokens(safeUser);
   }
 
   private generateTokens(user: any) {

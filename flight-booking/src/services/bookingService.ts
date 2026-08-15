@@ -16,7 +16,7 @@ export class BookingService {
       await client.query('BEGIN');
 
       const flight = await client.query(
-        'SELECT * FROM flights WHERE id = $1 FOR UPDATE',
+        'SELECT * FROM flights WHERE id = $1',
         [flightId]
       );
 
@@ -84,13 +84,13 @@ export class BookingService {
     return result.rows[0];
   }
 
-  async cancelBooking(bookingId: number) {
+  async cancelBooking(bookingId: number, userId: number) {
     const result = await pool.query(
-      `UPDATE bookings 
+      `UPDATE bookings
        SET status = 'cancelled', updated_at = NOW()
-       WHERE id = $1 AND status = 'confirmed'
+       WHERE id = $1 AND user_id = $2 AND status = 'confirmed'
        RETURNING *`,
-      [bookingId]
+      [bookingId, userId]
     );
 
     if (result.rows.length === 0) {

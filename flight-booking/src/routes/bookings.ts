@@ -36,11 +36,11 @@ router.get('/my-bookings', authMiddleware, async (req: AuthRequest, res: Respons
 
 router.post('/:id/cancel', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    // In a real app we'd ensure users only cancel their own bookings
-    const result = await bookingService.cancelBooking(parseInt(req.params.id));
+    const bookingId = parseInt(req.params.id);
+    const result = await bookingService.cancelBooking(bookingId, req.user!.userId);
     res.json({ message: 'Booking cancelled', booking: result });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    res.status(error.message.includes('not found') ? 404 : 400).json({ error: error.message });
   }
 });
 
