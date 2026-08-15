@@ -12,14 +12,7 @@ const app = express();
 const port = process.env.PORT || 5001;
 
 // Middleware
-// We need raw body for Stripe webhook, so let's handle that conditionally
-app.use((req, res, next) => {
-  if (req.originalUrl === '/payments/webhook') {
-    next();
-  } else {
-    express.json()(req, res, next);
-  }
-});
+app.use(express.json());
 app.use(cors());
 
 // Routes

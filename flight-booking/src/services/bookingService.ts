@@ -73,21 +73,44 @@ export class BookingService {
     }
   }
 
-  async confirmBooking(bookingId: number, stripePaymentIntentId: string) {
+  async confirmBooking(bookingId: number, userId: number, stripePaymentIntentId: string) {
     const result = await pool.query(
-      `UPDATE bookings 
-       SET status = 'confirmed', stripe_payment_intent_id = $1, updated_at = NOW()
-       WHERE id = $2
+      `UPDATE bookings
+       SET status = 'confirmed', stripe_payment_intent_id = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND user_id = $3 AND status = 'pending'
        RETURNING *`,
-      [stripePaymentIntentId, bookingId]
+      [stripePaymentIntentId, bookingId, userId]
     );
+
+    if (result.rows.length === 0) {
+      throw new Error('Booking not found or already processed');
+    }
+
     return result.rows[0];
+  }
+
+  async declineBooking(bookingId: number, userId: number) {
+    const result = await pool.query(
+      `UPDATE bookings
+       SET status = 'payment_failed', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND user_id = $2 AND status = 'pending'
+       RETURNING *`,
+      [bookingId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('Booking not found or already processed');
+    }
+
+    const booking = result.rows[0];
+    await this.releaseSeats(booking.id, booking.flight_id);
+    return booking;
   }
 
   async cancelBooking(bookingId: number, userId: number) {
     const result = await pool.query(
       `UPDATE bookings
-       SET status = 'cancelled', updated_at = NOW()
+       SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
        WHERE id = $1 AND user_id = $2 AND status = 'confirmed'
        RETURNING *`,
       [bookingId, userId]
@@ -98,17 +121,20 @@ export class BookingService {
     }
 
     const booking = result.rows[0];
+    await this.releaseSeats(booking.id, booking.flight_id);
+    return booking;
+  }
+
+  private async releaseSeats(bookingId: number, flightId: number) {
     const passengers = await pool.query(
-      'SELECT COUNT(*) FROM passengers WHERE booking_id = $1',
+      'SELECT COUNT(*) as count FROM passengers WHERE booking_id = $1',
       [bookingId]
     );
 
     await flightService.incrementSeats(
-      booking.flight_id,
+      flightId,
       parseInt(passengers.rows[0].count)
     );
-
-    return booking;
   }
 
   async getUserBookings(userId: number, page: number = 1, limit: number = 10) {

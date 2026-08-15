@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { PaymentService } from '../services/paymentService';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import pool from '../config/database';
@@ -30,13 +30,23 @@ router.post('/create-intent', authMiddleware, async (req: AuthRequest, res: Resp
   }
 });
 
-router.post('/webhook', async (req: Request, res: Response) => {
+router.post('/confirm', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const event = req.body;
-    await paymentService.handleWebhook(event);
-    res.json({ received: true });
-  } catch (error) {
-    res.status(400).json({ error: 'Webhook error' });
+    const { bookingId } = req.body;
+    const booking = await paymentService.confirmPayment(bookingId, req.user!.userId);
+    res.json(booking);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/decline', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { bookingId } = req.body;
+    const booking = await paymentService.declinePayment(bookingId, req.user!.userId);
+    res.json(booking);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 

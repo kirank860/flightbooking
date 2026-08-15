@@ -1,37 +1,29 @@
 import pool from '../config/database';
+import { BookingService } from './bookingService';
+
+const bookingService = new BookingService();
 
 export class PaymentService {
   async createPaymentIntent(bookingId: number, amount: number, email: string) {
-    // Mock Stripe payment intent creation
-    const paymentIntent = {
+    // Mock Stripe payment intent creation - no side effects, purely visual on the payment step
+    return {
       id: `pi_mock_${Math.random().toString(36).substr(2, 9)}`,
       client_secret: `pi_mock_${Math.random().toString(36).substr(2, 9)}_secret`,
       amount: Math.round(amount * 100),
       currency: 'usd',
       metadata: { bookingId },
       receipt_email: email,
-      status: 'succeeded', // Auto-succeed for local testing
+      status: 'requires_confirmation',
     };
-
-    // Auto-confirm the booking in the background for local testing
-    setTimeout(async () => {
-      try {
-        await pool.query(
-          `UPDATE bookings 
-           SET status = 'confirmed', stripe_payment_intent_id = $1
-           WHERE id = $2`,
-          [paymentIntent.id, bookingId]
-        );
-      } catch (err) {
-        console.error('Failed to auto-confirm mock booking:', err);
-      }
-    }, 1000);
-
-    return paymentIntent;
   }
 
-  async handleWebhook(event: any) {
-    // Not needed for local mock since we auto-confirm
+  async confirmPayment(bookingId: number, userId: number) {
+    const mockPaymentIntentId = `pi_mock_${Math.random().toString(36).substr(2, 9)}`;
+    return bookingService.confirmBooking(bookingId, userId, mockPaymentIntentId);
+  }
+
+  async declinePayment(bookingId: number, userId: number) {
+    return bookingService.declineBooking(bookingId, userId);
   }
 
   async refundPayment(bookingId: number) {
