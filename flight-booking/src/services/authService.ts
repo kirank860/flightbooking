@@ -10,6 +10,11 @@ interface TokenPayload {
 
 export class AuthService {
   async register(email: string, password: string) {
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      throw new Error('An account with this email already exists');
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await pool.query(
       'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role',
