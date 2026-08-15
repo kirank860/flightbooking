@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import StepProgress from '../components/StepProgress';
+import StripePaymentStep from '../components/StripePaymentStep';
 import apiClient from '../lib/apiClient';
 import { useAuthStore } from '../store/authStore';
 
@@ -55,7 +56,6 @@ export default function CheckoutPage() {
   const [flight, setFlight] = useState<Flight | null>(null);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
   const [payFailed, setPayFailed] = useState(false);
   const [booking, setBooking] = useState<Booking | null>(null);
@@ -98,33 +98,13 @@ export default function CheckoutPage() {
     }
   };
 
-  const handlePay = async () => {
-    if (!booking) return;
-    setPaying(true);
-    setError('');
-    try {
-      await apiClient.post('/payments/confirm', { bookingId: booking.id });
-      router.push(`/confirmation?bookingId=${booking.id}`);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Payment could not be confirmed.');
-    } finally {
-      setPaying(false);
-    }
+  const handlePaymentSuccess = (bookingId: number) => {
+    router.push(`/confirmation?bookingId=${bookingId}`);
   };
 
-  const handleDeclinePreview = async () => {
-    if (!booking) return;
-    setPaying(true);
-    setError('');
-    try {
-      await apiClient.post('/payments/decline', { bookingId: booking.id });
-      setPayFailed(true);
-      setBooking(null);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Something went wrong.');
-    } finally {
-      setPaying(false);
-    }
+  const handlePaymentDecline = () => {
+    setPayFailed(true);
+    setBooking(null);
   };
 
   if (initializing || !user || !flight) {
@@ -215,66 +195,16 @@ export default function CheckoutPage() {
         )}
 
         {step === 2 && booking && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex gap-5 flex-wrap items-start">
-            <section className="flex-[2] min-w-[380px] bg-surface border border-border rounded-[20px] p-5 sm:p-8">
-              <h2 className="font-serif font-normal text-[clamp(26px,3.6vw,36px)] mb-1.5 tracking-[-0.01em]">Payment</h2>
-              <p className="text-sm text-ink-muted mb-6.5 mb-[26px] font-light">Your booking is held in a pending state until the payment clears.</p>
-
-              <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                <label className="flex flex-col gap-[7px]" style={{ gridColumn: '1 / -1' }}>
-                  <span className={labelClass}>Card number</span>
-                  <input placeholder="4242 4242 4242 4242" className={inputClass} />
-                </label>
-                <label className="flex flex-col gap-[7px]">
-                  <span className={labelClass}>Expiry</span>
-                  <input placeholder="09 / 29" className={inputClass} />
-                </label>
-                <label className="flex flex-col gap-[7px]">
-                  <span className={labelClass}>CVC</span>
-                  <input placeholder="123" className={inputClass} />
-                </label>
-                <label className="flex flex-col gap-[7px]" style={{ gridColumn: '1 / -1' }}>
-                  <span className={labelClass}>Name on card</span>
-                  <input placeholder={passengers[0]?.full_name || 'Anika Raman'} className={inputClass} />
-                </label>
-              </div>
-
-              <div className="flex items-center gap-2.5 mt-5 text-xs text-ink-muted">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
-                <span>This is a mock payment step — no real card data is collected or sent anywhere.</span>
-              </div>
-            </section>
-
-            <aside className="flex-1 min-w-[260px] sticky top-24 bg-surface border border-border rounded-[20px] p-6">
-              <div className="text-xs tracking-[0.12em] uppercase text-ink-muted mb-3.5">Order</div>
-              <div className="text-[17px] mb-1">{flight.origin} → {flight.destination}</div>
-              <div className="text-[13px] text-ink-muted mb-4.5 mb-[18px]">{passengerCount} {passengerCount > 1 ? 'passengers' : 'passenger'} &middot; {flight.departure_date}</div>
-              <div className="flex flex-col gap-2.5 text-[15px] border-t border-border pt-4">
-                <div className="flex justify-between gap-3"><span className="text-ink-secondary">Fare &times; {passengerCount}</span><span>AED {total}</span></div>
-                <div className="flex justify-between gap-3"><span className="text-ink-secondary">Taxes &amp; fees</span><span>Included</span></div>
-              </div>
-              <div className="border-t border-border my-4 pt-4 flex justify-between items-baseline gap-3">
-                <span className="text-[15px]">Total</span>
-                <span className="font-serif text-[30px]">AED {total}</span>
-              </div>
-              <div className="inline-flex items-center gap-2 bg-warn-bg border border-warn-border text-warn-text rounded-full px-3.5 py-[7px] text-xs mb-4">
-                Booking pending until payment clears
-              </div>
-              <button
-                onClick={handlePay}
-                disabled={paying}
-                className="w-full bg-accent text-page border-none rounded-xl py-[15px] text-base font-medium cursor-pointer min-h-[52px] hover:bg-accent-hover transition-colors disabled:opacity-60"
-              >
-                {paying ? 'Processing…' : `Pay AED ${total}`}
-              </button>
-              <button
-                onClick={handleDeclinePreview}
-                disabled={paying}
-                className="w-full bg-transparent border border-border-input text-ink-muted rounded-xl py-3 text-[13px] cursor-pointer min-h-[44px] mt-2.5 hover:border-[#C9C1B4] transition-colors disabled:opacity-60"
-              >
-                Preview declined-card state
-              </button>
-            </aside>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <StripePaymentStep
+              flight={flight}
+              booking={booking}
+              passengerCount={passengerCount}
+              billingName={passengers[0]?.full_name || ''}
+              setError={setError}
+              onSuccess={handlePaymentSuccess}
+              onDecline={handlePaymentDecline}
+            />
           </motion.div>
         )}
 
