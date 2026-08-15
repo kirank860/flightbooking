@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { ShieldCheck, BadgePercent, Headset, MapPin } from 'lucide-react';
 import apiClient from '../lib/apiClient';
 import { useAuthStore } from '../store/authStore';
 
@@ -17,6 +18,12 @@ interface Flight {
   seats_available: number;
 }
 
+const TRUST_POINTS = [
+  { icon: ShieldCheck, title: 'Secure Payments', desc: 'Encrypted checkout, every time' },
+  { icon: BadgePercent, title: 'Best Price Guarantee', desc: "We'll match a lower fare" },
+  { icon: Headset, title: '24/7 Support', desc: 'Real humans, always on' },
+];
+
 export default function SearchPage() {
   const router = useRouter();
   const { logout } = useAuthStore();
@@ -30,10 +37,36 @@ export default function SearchPage() {
   const [flights, setFlights] = useState<Flight[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [popularDestinations, setPopularDestinations] = useState<Flight[]>([]);
+
+  useEffect(() => {
+    const fetchPopular = async () => {
+      try {
+        const { data } = await apiClient.get('/flights/popular');
+        setPopularDestinations(data.destinations);
+      } catch (error) {
+        console.error('Failed to load popular destinations', error);
+      }
+    };
+    fetchPopular();
+  }, []);
 
   const handleLogout = () => {
     logout();
     router.push('/login');
+  };
+
+  const searchRoute = (origin: string, destination: string, date: string) => {
+    setFormData({ ...formData, origin, destination, date });
+    setLoading(true);
+    apiClient
+      .get('/flights/search', { params: { origin, destination, date, passengerCount: formData.passengerCount } })
+      .then(({ data }) => {
+        setFlights(data.flights);
+        setHasSearched(true);
+      })
+      .catch(() => setHasSearched(true))
+      .finally(() => setLoading(false));
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -181,6 +214,80 @@ export default function SearchPage() {
             </button>
           </div>
         </motion.form>
+
+        {/* Popular Destinations + Trust Strip (pre-search state) */}
+        {!hasSearched && (
+          <>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="mt-20"
+            >
+              <h3 className="text-2xl font-bold mb-8 flex items-center gap-3">
+                <span className="bg-blue-500/20 text-blue-400 p-2 rounded-lg">
+                  <MapPin className="w-5 h-5" aria-hidden="true" />
+                </span>
+                Popular Destinations
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {popularDestinations.map((dest, index) => (
+                  <motion.button
+                    key={dest.id}
+                    type="button"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.08 }}
+                    onClick={() => searchRoute(dest.origin, dest.destination, dest.departure_date)}
+                    className="group relative bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 text-left hover:bg-slate-800/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_40px_-10px_rgba(59,130,246,0.3)]"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2 text-lg font-bold text-white">
+                        <span>{dest.origin}</span>
+                        <span className="text-slate-600">⟶</span>
+                        <span>{dest.destination}</span>
+                      </div>
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{dest.airline}</span>
+                    </div>
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <div className="text-xs text-slate-400 mb-1">Starting from</div>
+                        <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">
+                          AED {dest.price}
+                        </div>
+                      </div>
+                      <span className="text-sm font-medium text-blue-400 group-hover:text-blue-300 transition-colors">
+                        Search →
+                      </span>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.5 }}
+              className="mt-20 grid grid-cols-1 sm:grid-cols-3 gap-6"
+            >
+              {TRUST_POINTS.map(({ icon: Icon, title, desc }) => (
+                <div
+                  key={title}
+                  className="flex items-start gap-4 bg-slate-800/30 border border-slate-700/40 rounded-2xl p-6"
+                >
+                  <span className="shrink-0 bg-blue-500/20 text-blue-400 p-2.5 rounded-xl">
+                    <Icon className="w-5 h-5" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <div className="font-semibold text-white">{title}</div>
+                    <div className="text-sm text-slate-400 mt-0.5">{desc}</div>
+                  </div>
+                </div>
+              ))}
+            </motion.div>
+          </>
+        )}
 
         {/* Results Section */}
         {hasSearched && flights.length === 0 && !loading && (

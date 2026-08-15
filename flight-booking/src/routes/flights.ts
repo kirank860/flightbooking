@@ -21,6 +21,15 @@ router.get('/search', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/popular', async (req: Request, res: Response) => {
+  try {
+    const destinations = await flightService.getPopularDestinations(6);
+    res.json({ destinations });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const result = await flightService.getFlightById(parseInt(req.params.id as string));

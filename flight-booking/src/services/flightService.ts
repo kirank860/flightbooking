@@ -37,6 +37,26 @@ export class FlightService {
     };
   }
 
+  async getPopularDestinations(limit: number = 6) {
+    const result = await pool.query(
+      `SELECT f.* FROM flights f
+       INNER JOIN (
+         SELECT origin, destination, MIN(price) as min_price
+         FROM flights
+         WHERE seats_available > 0
+         GROUP BY origin, destination
+       ) cheapest ON f.origin = cheapest.origin
+                 AND f.destination = cheapest.destination
+                 AND f.price = cheapest.min_price
+       GROUP BY f.origin, f.destination
+       ORDER BY f.price ASC
+       LIMIT $1`,
+      [limit]
+    );
+
+    return result.rows;
+  }
+
   async getFlightById(flightId: number) {
     const result = await pool.query(
       'SELECT * FROM flights WHERE id = $1',
