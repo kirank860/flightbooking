@@ -107,22 +107,45 @@ export class BookingService {
     return booking;
   }
 
-  async cancelBooking(bookingId: number, userId: number) {
-    const result = await pool.query(
-      `UPDATE bookings
-       SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 AND user_id = $2 AND status = 'confirmed'
-       RETURNING *`,
-      [bookingId, userId]
+  async cancelBooking(bookingId: number, userId: number, isAdmin: boolean = false) {
+    const lookup = await pool.query(
+      `SELECT b.*, f.departure_date, f.departure_time
+       FROM bookings b
+       JOIN flights f ON b.flight_id = f.id
+       WHERE b.id = $1`,
+      [bookingId]
     );
 
-    if (result.rows.length === 0) {
+    if (lookup.rows.length === 0) {
+      throw new Error('Booking not found');
+    }
+
+    const booking = lookup.rows[0];
+
+    if (!isAdmin && booking.user_id !== userId) {
+      throw new Error('Booking not found');
+    }
+
+    if (booking.status !== 'confirmed') {
       throw new Error('Booking not found or already cancelled');
     }
 
-    const booking = result.rows[0];
-    await this.releaseSeats(booking.id, booking.flight_id);
-    return booking;
+    if (!isAdmin) {
+      const departureAt = new Date(`${booking.departure_date}T${booking.departure_time}:00`);
+      const cutoff = new Date(departureAt.getTime() - 24 * 60 * 60 * 1000);
+      if (new Date() > cutoff) {
+        throw new Error('This booking departs in under 24 hours, which is past the free-cancellation window');
+      }
+    }
+
+    const result = await pool.query(
+      `UPDATE bookings SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
+      [bookingId]
+    );
+
+    const updated = result.rows[0];
+    await this.releaseSeats(updated.id, updated.flight_id);
+    return updated;
   }
 
   private async releaseSeats(bookingId: number, flightId: number) {
@@ -141,7 +164,8 @@ export class BookingService {
     const offset = (page - 1) * limit;
 
     const result = await pool.query(
-      `SELECT b.*, f.airline, f.origin, f.destination, f.departure_date
+      `SELECT b.*, f.airline, f.origin, f.destination, f.departure_date, f.departure_time,
+              (SELECT COUNT(*) FROM passengers p WHERE p.booking_id = b.id) as passenger_count
        FROM bookings b
        JOIN flights f ON b.flight_id = f.id
        WHERE b.user_id = $1
