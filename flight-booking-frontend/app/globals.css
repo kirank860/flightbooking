@@ -1,12 +1,48 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-public-sans);
+  --font-serif: var(--font-instrument-serif);
+  --font-mono: ui-monospace, Menlo, monospace;
+
+  --color-page: #FBFAF7;
+  --color-surface: #FFFFFF;
+  --color-input: #FDFCFA;
+  --color-band: #F5F1EA;
+
+  --color-ink: #16191C;
+  --color-ink-secondary: #4A5158;
+  --color-ink-muted: #7C8489;
+  --color-ink-faint: #9AA0A6;
+
+  --color-border: #E8E3DA;
+  --color-border-input: #E0DACF;
+  --color-border-row: #F0ECE4;
+
+  --color-accent: #0E5C63;
+  --color-accent-hover: #0A4247;
+  --color-accent-tint: #E4EFEC;
+
+  --color-warn-bg: #FDF6E7;
+  --color-warn-text: #8A6B1F;
+  --color-warn-border: #EBDCBB;
+
+  --color-danger-bg: #FBF1EE;
+  --color-danger-text: #A63A2B;
+  --color-danger-body: #7A5148;
+  --color-danger-border: #E4C4BC;
 }
 
 body {
   font-family: var(--font-sans), sans-serif;
-  background-color: #0f172a; /* slate-900 */
-  color: #f8fafc; /* slate-50 */
+  background-color: var(--color-page);
+  color: var(--color-ink);
+}
+
+::placeholder {
+  color: var(--color-ink-faint);
+}
+
+.placeholder-fill {
+  background-image: repeating-linear-gradient(135deg, #EFEAE1 0 8px, #F6F2EB 8px 16px);
 }
