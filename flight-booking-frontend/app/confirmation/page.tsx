@@ -160,7 +160,7 @@ export default function ConfirmationPage() {
           className="flex gap-4"
         >
           <button
-            onClick={() => router.push('/search')}
+            onClick={() => router.push('/')}
             className="flex-1 px-6 py-4 rounded-lg border border-slate-700 text-white hover:bg-slate-800 transition-all font-semibold"
           >
             Book Another Flight
