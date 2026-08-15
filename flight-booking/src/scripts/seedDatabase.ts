@@ -96,6 +96,11 @@ const db = new sqlite3.Database(dbPath, async (err) => {
         `INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)`,
         ['test@example.com', hashedPass, 'user']
       );
+      const hashedAdminPass = await bcrypt.hash('admin123', 10);
+      db.run(
+        `INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)`,
+        ['admin@example.com', hashedAdminPass, 'admin']
+      );
 
       // Insert dummy flights
       const flights = [

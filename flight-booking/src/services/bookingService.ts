@@ -176,4 +176,87 @@ export class BookingService {
 
     return result.rows;
   }
+
+  async getAllBookings(filters: {
+    status?: string | undefined;
+    date?: string | undefined;
+    route?: string | undefined;
+    page?: number;
+    limit?: number;
+  }) {
+    const { status, date, route, page = 1, limit = 10 } = filters;
+    const offset = (page - 1) * limit;
+
+    const conditions: string[] = [];
+    const values: any[] = [];
+
+    if (status) {
+      values.push(status);
+      conditions.push(`b.status = $${values.length}`);
+    }
+    if (date) {
+      values.push(date);
+      conditions.push(`f.departure_date = $${values.length}`);
+    }
+    if (route) {
+      values.push(`%${route.replace(/[^a-zA-Z]/g, '').toUpperCase()}%`);
+      conditions.push(`UPPER(f.origin || f.destination) LIKE $${values.length}`);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const rowsResult = await pool.query(
+      `SELECT b.*, f.airline, f.origin, f.destination, f.departure_date,
+              u.email as user_email,
+              (SELECT COUNT(*) FROM passengers p WHERE p.booking_id = b.id) as passenger_count
+       FROM bookings b
+       JOIN flights f ON b.flight_id = f.id
+       JOIN users u ON b.user_id = u.id
+       ${where}
+       ORDER BY b.created_at DESC
+       LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+      [...values, limit, offset]
+    );
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) as count
+       FROM bookings b
+       JOIN flights f ON b.flight_id = f.id
+       ${where}`,
+      values
+    );
+
+    return {
+      bookings: rowsResult.rows,
+      total: parseInt(countResult.rows[0].count),
+      page,
+      limit,
+    };
+  }
+
+  async getDashboardStats() {
+    const [bookingsToday, revenueToday, statusCounts, seatsSold] = await Promise.all([
+      pool.query(`SELECT COUNT(*) as count FROM bookings WHERE date(created_at) = date('now')`, []),
+      pool.query(
+        `SELECT COALESCE(SUM(total_price), 0) as revenue FROM bookings WHERE status = 'confirmed' AND date(created_at) = date('now')`,
+        []
+      ),
+      pool.query(`SELECT status, COUNT(*) as count FROM bookings GROUP BY status`, []),
+      pool.query(`SELECT COALESCE(SUM(total_seats - seats_available), 0) as sold FROM flights`, []),
+    ]);
+
+    const counts: Record<string, number> = {};
+    for (const row of statusCounts.rows) {
+      counts[row.status] = parseInt(row.count);
+    }
+    const totalBookings = Object.values(counts).reduce((sum, n) => sum + n, 0);
+    const cancellationRate = totalBookings > 0 ? ((counts.cancelled || 0) / totalBookings) * 100 : 0;
+
+    return {
+      bookingsToday: parseInt(bookingsToday.rows[0].count),
+      revenueToday: revenueToday.rows[0].revenue,
+      cancellationRate: Math.round(cancellationRate * 10) / 10,
+      seatsSold: parseInt(seatsSold.rows[0].sold),
+    };
+  }
 }

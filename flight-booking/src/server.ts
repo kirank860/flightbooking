@@ -5,6 +5,7 @@ import authRoutes from './routes/auth';
 import flightRoutes from './routes/flights';
 import bookingRoutes from './routes/bookings';
 import paymentRoutes from './routes/payment';
+import adminRoutes from './routes/admin';
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use('/auth', authRoutes);
 app.use('/flights', flightRoutes);
 app.use('/bookings', bookingRoutes);
 app.use('/payments', paymentRoutes);
+app.use('/admin', adminRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
