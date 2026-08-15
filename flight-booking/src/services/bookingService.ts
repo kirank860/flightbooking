@@ -78,6 +78,26 @@ export class BookingService {
     return result.rows[0];
   }
 
+  // The webhook and the client's own post-payment confirm/decline calls race
+  // by design (see paymentService.confirmPayment/declinePayment) - if the
+  // webhook already won, these let the client call treat that as success
+  // instead of an error.
+  private async getBookingWithStatus(bookingId: number, userId: number, status: string) {
+    const result = await pool.query(
+      `SELECT * FROM bookings WHERE id = $1 AND user_id = $2 AND status = $3`,
+      [bookingId, userId, status]
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async getConfirmedBooking(bookingId: number, userId: number) {
+    return this.getBookingWithStatus(bookingId, userId, 'confirmed');
+  }
+
+  async getFailedBooking(bookingId: number, userId: number) {
+    return this.getBookingWithStatus(bookingId, userId, 'payment_failed');
+  }
+
   async declineBooking(bookingId: number, userId: number) {
     const result = await pool.query(
       `UPDATE bookings

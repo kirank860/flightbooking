@@ -12,17 +12,23 @@ export class PaymentService {
       currency: 'aed',
       receipt_email: email,
       metadata: { bookingId: String(bookingId), userId: String(userId) },
-      automatic_payment_methods: { enabled: true },
+      // Card-only: the frontend uses CardElement, not the redirect-capable
+      // PaymentElement, so redirect-based methods need to stay off (they'd
+      // otherwise require a return_url).
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
     });
   }
 
-  // Client calls this right after getStripe().confirmCardPayment() resolves, so the
+  // Client calls this right after Stripe.js's stripe.confirmCardPayment() resolves, so the
   // UI can move on immediately. We don't just trust the client's word that it
   // succeeded — we re-fetch the PaymentIntent from Stripe and check its real
   // status before touching the booking. The webhook handler performs the same
   // confirmBooking() call independently as the source-of-truth backstop (e.g.
-  // if the browser closes before this call fires); confirmBooking's
-  // `AND status = 'pending'` guard makes both paths idempotent together.
+  // if the browser closes before this call fires). In practice the webhook
+  // often wins that race (confirmed by testing - it can land before this
+  // client call even starts), so a "not pending anymore" failure here is
+  // treated as success rather than surfaced as an error, as long as the
+  // booking really did land on 'confirmed'.
   async confirmPayment(bookingId: number, userId: number, paymentIntentId: string) {
     const intent = await getStripe().paymentIntents.retrieve(paymentIntentId);
 
@@ -33,11 +39,23 @@ export class PaymentService {
       throw new Error('Payment has not succeeded yet');
     }
 
-    return bookingService.confirmBooking(bookingId, userId, paymentIntentId);
+    try {
+      return await bookingService.confirmBooking(bookingId, userId, paymentIntentId);
+    } catch (error) {
+      const alreadyConfirmed = await bookingService.getConfirmedBooking(bookingId, userId);
+      if (alreadyConfirmed) return alreadyConfirmed;
+      throw error;
+    }
   }
 
   async declinePayment(bookingId: number, userId: number) {
-    return bookingService.declineBooking(bookingId, userId);
+    try {
+      return await bookingService.declineBooking(bookingId, userId);
+    } catch (error) {
+      const alreadyFailed = await bookingService.getFailedBooking(bookingId, userId);
+      if (alreadyFailed) return alreadyFailed;
+      throw error;
+    }
   }
 
   async refundPayment(bookingId: number): Promise<Stripe.Refund | { id: null; status: 'not_applicable' }> {
