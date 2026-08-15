@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { AuthService } from '../services/authService';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const authService = new AuthService();
@@ -31,6 +32,15 @@ router.post('/refresh', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     res.status(401).json({ error: error.message });
+  }
+});
+
+router.post('/logout', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    await authService.logout(req.user!.userId);
+    res.json({ message: 'Logged out' });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 

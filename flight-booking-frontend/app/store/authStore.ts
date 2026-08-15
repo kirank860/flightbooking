@@ -23,13 +23,23 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   logout: () => {
+    const { accessToken } = get();
     localStorage.removeItem('refreshToken');
     set({ user: null, accessToken: null, refreshToken: null });
+    if (accessToken) {
+      fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001') + '/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).catch(() => {});
+    }
   },
 
   refreshAccessToken: async () => {
     const refreshToken = localStorage.getItem('refreshToken');
-    if (!refreshToken) return;
+    if (!refreshToken) {
+      get().logout();
+      throw new Error('No refresh token');
+    }
 
     try {
       const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001') + '/auth/refresh', {
@@ -44,13 +54,18 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       set({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user });
     } catch (error) {
       get().logout();
+      throw error;
     }
   },
 
   bootstrap: async () => {
     const refreshToken = localStorage.getItem('refreshToken');
     if (refreshToken) {
-      await get().refreshAccessToken();
+      try {
+        await get().refreshAccessToken();
+      } catch {
+        // refreshAccessToken already logs out on failure
+      }
     }
     set({ initializing: false });
   },

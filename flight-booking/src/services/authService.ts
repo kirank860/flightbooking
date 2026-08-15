@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
+import crypto from 'crypto';
 import pool from '../config/database';
 
 interface TokenPayload {
@@ -41,7 +42,12 @@ export class AuthService {
     }
 
     const { password_hash, ...safeUser } = user;
-    return this.generateTokens(safeUser);
+    const tokens = this.generateTokens(safeUser);
+    await pool.query('UPDATE users SET current_refresh_token = $1 WHERE id = $2', [
+      tokens.refreshToken,
+      user.id,
+    ]);
+    return tokens;
   }
 
   private generateTokens(user: any) {
@@ -55,7 +61,10 @@ export class AuthService {
       expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m',
     } as SignOptions);
 
-    const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET!, {
+    // jti guarantees each refresh token is unique even if issued within the
+    // same second (JWT signing is otherwise deterministic for identical
+    // payload+iat), which the rotation reuse-check in refreshToken() depends on.
+    const refreshToken = jwt.sign({ ...payload, jti: crypto.randomUUID() }, process.env.JWT_REFRESH_SECRET!, {
       expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '7d',
     } as SignOptions);
 
@@ -63,24 +72,41 @@ export class AuthService {
   }
 
   async refreshToken(refreshToken: string) {
+    let payload: TokenPayload;
     try {
-      const payload = jwt.verify(
-        refreshToken,
-        process.env.JWT_REFRESH_SECRET!
-      ) as TokenPayload;
-
-      const result = await pool.query(
-        'SELECT id, email, role FROM users WHERE id = $1',
-        [payload.userId]
-      );
-
-      if (result.rows.length === 0) {
-        throw new Error('User not found');
-      }
-
-      return this.generateTokens(result.rows[0]);
+      payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as TokenPayload;
     } catch (error) {
       throw new Error('Invalid refresh token');
     }
+
+    const result = await pool.query(
+      'SELECT id, email, role, current_refresh_token FROM users WHERE id = $1',
+      [payload.userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('User not found');
+    }
+
+    const user = result.rows[0];
+
+    // Reject reused/stale refresh tokens: only the most recently issued token
+    // for this user is valid. A mismatch means the token was already rotated
+    // away (or possibly stolen), so wipe the stored token and force re-login.
+    if (user.current_refresh_token !== refreshToken) {
+      await pool.query('UPDATE users SET current_refresh_token = NULL WHERE id = $1', [user.id]);
+      throw new Error('Invalid refresh token');
+    }
+
+    const tokens = this.generateTokens({ id: user.id, email: user.email, role: user.role });
+    await pool.query('UPDATE users SET current_refresh_token = $1 WHERE id = $2', [
+      tokens.refreshToken,
+      user.id,
+    ]);
+    return tokens;
+  }
+
+  async logout(userId: number) {
+    await pool.query('UPDATE users SET current_refresh_token = NULL WHERE id = $1', [userId]);
   }
 }

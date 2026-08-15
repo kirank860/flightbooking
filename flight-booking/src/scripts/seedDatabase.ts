@@ -140,6 +140,7 @@ const db = new sqlite3.Database(dbPath, async (err) => {
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'user',
+        current_refresh_token TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
