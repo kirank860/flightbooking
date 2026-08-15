@@ -6,28 +6,46 @@ import Header from '../components/Header';
 import { useAuthStore } from '../store/authStore';
 import apiClient from '../lib/apiClient';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [credentialsError, setCredentialsError] = useState('');
   const [loading, setLoading] = useState(false);
   const setAuth = useAuthStore((state) => state.setAuth);
 
+  const emailFormatError = emailTouched && email.length > 0 && !EMAIL_RE.test(email)
+    ? 'Enter a valid email address.'
+    : '';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setCredentialsError('');
+    setEmailTouched(true);
 
+    if (!EMAIL_RE.test(email)) {
+      return;
+    }
+
+    setLoading(true);
     try {
       const { data } = await apiClient.post('/auth/login', { email, password });
       setAuth(data.user, data.accessToken, data.refreshToken);
       window.location.href = '/';
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Invalid credentials. Please try again.');
+      if (err.response?.status === 401) {
+        setCredentialsError('That email and password don’t match. Double-check your password and try again.');
+      } else {
+        setCredentialsError(err.response?.data?.error || 'Something went wrong. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const credentialsInvalid = Boolean(credentialsError);
 
   return (
     <div className="min-h-screen flex flex-col bg-page">
@@ -37,23 +55,24 @@ export default function LoginPage() {
           <h2 className="font-serif font-normal text-[clamp(30px,4.6vw,44px)] mb-2 tracking-[-0.01em]">Welcome back</h2>
           <p className="text-[15px] text-ink-muted mb-7 font-light">Sign in to see your trips and finish any pending bookings.</p>
 
-          <form onSubmit={handleSubmit} className="bg-surface border border-border rounded-[20px] p-5 sm:p-7 flex flex-col gap-3.5">
-            {error && (
-              <div className="text-sm bg-danger-bg border border-danger-border text-danger-body rounded-xl px-4 py-3">
-                {error}
-              </div>
-            )}
-
+          <form onSubmit={handleSubmit} className="bg-surface border border-border rounded-[20px] p-5 sm:p-7 flex flex-col gap-3.5" noValidate>
             <label className="flex flex-col gap-[7px]">
               <span className="text-xs tracking-[0.1em] uppercase text-ink-muted">Email</span>
               <input
                 type="email"
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="border border-border-input rounded-xl px-[15px] py-3.5 text-base bg-input outline-none focus:border-accent transition-colors"
-                required
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setCredentialsError('');
+                }}
+                onBlur={() => setEmailTouched(true)}
+                aria-invalid={Boolean(emailFormatError) || credentialsInvalid}
+                className={`border rounded-xl px-[15px] py-3.5 text-base bg-input outline-none transition-colors ${
+                  emailFormatError || credentialsInvalid ? 'border-danger-text focus:border-danger-text' : 'border-border-input focus:border-accent'
+                }`}
               />
+              {emailFormatError && <span className="text-xs text-danger-text">{emailFormatError}</span>}
             </label>
 
             <label className="flex flex-col gap-[7px]">
@@ -62,10 +81,16 @@ export default function LoginPage() {
                 type="password"
                 placeholder="At least 8 characters"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="border border-border-input rounded-xl px-[15px] py-3.5 text-base bg-input outline-none focus:border-accent transition-colors"
-                required
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setCredentialsError('');
+                }}
+                aria-invalid={credentialsInvalid}
+                className={`border rounded-xl px-[15px] py-3.5 text-base bg-input outline-none transition-colors ${
+                  credentialsInvalid ? 'border-danger-text focus:border-danger-text' : 'border-border-input focus:border-accent'
+                }`}
               />
+              {credentialsError && <span className="text-xs text-danger-text">{credentialsError}</span>}
             </label>
 
             <button
