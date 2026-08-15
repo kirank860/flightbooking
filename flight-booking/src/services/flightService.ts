@@ -23,7 +23,7 @@ export class FlightService {
     );
 
     const countResult = await pool.query(
-      `SELECT COUNT(*) FROM flights
+      `SELECT COUNT(*) as count FROM flights
        WHERE origin = $1 AND destination = $2 
              AND departure_date = $3 AND seats_available >= $4`,
       [origin, destination, date, passengerCount]
