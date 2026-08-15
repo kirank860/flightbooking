@@ -13,10 +13,6 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Concurrent 401s share a single in-flight refresh instead of each firing their
-// own /auth/refresh call (which would race on the rotated refresh token).
-let refreshPromise: Promise<void> | null = null;
-
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -27,14 +23,11 @@ apiClient.interceptors.response.use(
     }
     originalRequest._retry = true;
 
-    if (!refreshPromise) {
-      refreshPromise = useAuthStore.getState().refreshAccessToken().finally(() => {
-        refreshPromise = null;
-      });
-    }
-
+    // refreshAccessToken() itself dedupes concurrent callers onto one
+    // in-flight request, so it's safe to call directly here even if
+    // something else (e.g. AuthBootstrap) is refreshing at the same time.
     try {
-      await refreshPromise;
+      await useAuthStore.getState().refreshAccessToken();
     } catch {
       return Promise.reject(error);
     }
