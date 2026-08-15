@@ -10,45 +10,35 @@ export class BookingService {
     passengerCount: number,
     passengers: any[]
   ) {
-    const client = await pool.connect();
+    const flight = await flightService.getFlightById(flightId);
+    if (!flight) {
+      throw new Error('Flight not found');
+    }
+
+    // decrementSeats does a single atomic UPDATE guarded by the same WHERE
+    // clause it decrements against: SQLite serializes statements on this
+    // connection, so this is the actual concurrency boundary — two simultaneous
+    // bookings for the last seat can't both pass, because only one UPDATE can
+    // see seats_available still satisfy the condition. (A prior version wrapped
+    // a SELECT+UPDATE in a hand-rolled BEGIN/COMMIT "transaction" over a shared
+    // connection with no real per-request isolation; concurrent requests
+    // collided and every single one failed.)
+    const decremented = await flightService.decrementSeats(flightId, passengerCount);
+    const price = decremented.price;
 
     try {
-      await client.query('BEGIN');
-
-      const flight = await client.query(
-        'SELECT * FROM flights WHERE id = $1',
-        [flightId]
-      );
-
-      if (flight.rows.length === 0) {
-        throw new Error('Flight not found');
-      }
-
-      if (flight.rows[0].seats_available < passengerCount) {
-        throw new Error('Not enough seats available');
-      }
-
-      await client.query(
-        `UPDATE flights SET seats_available = seats_available - $1 WHERE id = $2`,
-        [passengerCount, flightId]
-      );
-
-      const bookingResult = await client.query(
-        `INSERT INTO bookings (user_id, flight_id, status, total_price) 
+      const bookingResult = await pool.query(
+        `INSERT INTO bookings (user_id, flight_id, status, total_price)
          VALUES ($1, $2, 'pending', $3)
          RETURNING *`,
-        [
-          userId,
-          flightId,
-          flight.rows[0].price * passengerCount,
-        ]
+        [userId, flightId, price * passengerCount]
       );
 
       const booking = bookingResult.rows[0];
 
       for (const passenger of passengers) {
-        await client.query(
-          `INSERT INTO passengers 
+        await pool.query(
+          `INSERT INTO passengers
            (booking_id, full_name, date_of_birth, nationality, passport_number, email, contact_number)
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
@@ -63,13 +53,12 @@ export class BookingService {
         );
       }
 
-      await client.query('COMMIT');
       return booking;
     } catch (error) {
-      await client.query('ROLLBACK');
+      // Booking/passenger insert failed after the seat was already claimed —
+      // give it back rather than leaking it.
+      await flightService.incrementSeats(flightId, passengerCount);
       throw error;
-    } finally {
-      client.release();
     }
   }
 

@@ -66,12 +66,14 @@ export class FlightService {
   }
 
   async decrementSeats(flightId: number, count: number) {
+    // The SQLite shim does blind positional $N -> ? replacement with no
+    // parameter reuse, so $1 must not appear twice — pass count again as $3.
     const result = await pool.query(
-      `UPDATE flights 
+      `UPDATE flights
        SET seats_available = seats_available - $1
-       WHERE id = $2 AND seats_available >= $1
-       RETURNING seats_available`,
-      [count, flightId]
+       WHERE id = $2 AND seats_available >= $3
+       RETURNING seats_available, price`,
+      [count, flightId, count]
     );
 
     if (result.rows.length === 0) {
