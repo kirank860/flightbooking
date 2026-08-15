@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Instrument_Serif, Public_Sans } from "next/font/google";
+import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
 import AuthBootstrap from "./components/AuthBootstrap";
+import PageTransition from "./components/PageTransition";
 
 const instrumentSerif = Instrument_Serif({
   variable: "--font-instrument-serif",
@@ -29,8 +31,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-page text-ink">
+        <NextTopLoader color="#0E5C63" height={3} showSpinner={false} shadow="0 0 10px #0E5C63,0 0 5px #0E5C63" />
         <AuthBootstrap />
-        {children}
+        <PageTransition>{children}</PageTransition>
       </body>
     </html>
   );
