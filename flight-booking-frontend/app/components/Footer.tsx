@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function Footer() {
   return (
     <footer className="border-t border-border px-4 sm:px-8 lg:px-14 py-10 sm:py-13 bg-band mt-auto">
@@ -10,8 +12,8 @@ export default function Footer() {
         </div>
         <div className="flex flex-col gap-2 text-sm">
           <span className="text-xs tracking-[0.12em] uppercase text-ink-muted mb-1">Book</span>
-          <a href="/" className="text-accent hover:text-accent-hover">Flights</a>
-          <a href="/bookings" className="text-accent hover:text-accent-hover">Manage booking</a>
+          <Link href="/" className="text-accent hover:text-accent-hover">Flights</Link>
+          <Link href="/bookings" className="text-accent hover:text-accent-hover">Manage booking</Link>
         </div>
         <div className="flex flex-col gap-2 text-sm">
           <span className="text-xs tracking-[0.12em] uppercase text-ink-muted mb-1">Support</span>

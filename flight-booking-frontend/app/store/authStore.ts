@@ -1,11 +1,17 @@
 import { create } from 'zustand';
 
+export interface User {
+  id: number;
+  email: string;
+  role: 'user' | 'admin';
+}
+
 interface AuthStore {
-  user: any;
+  user: User | null;
   accessToken: string | null;
   refreshToken: string | null;
   initializing: boolean;
-  setAuth: (user: any, accessToken: string, refreshToken: string) => void;
+  setAuth: (user: User, accessToken: string, refreshToken: string) => void;
   logout: () => void;
   refreshAccessToken: () => Promise<void>;
   bootstrap: () => Promise<void>;

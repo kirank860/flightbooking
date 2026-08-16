@@ -8,6 +8,7 @@ import Footer from '../components/Footer';
 import StepProgress from '../components/StepProgress';
 import StripePaymentStep from '../components/StripePaymentStep';
 import apiClient from '../lib/apiClient';
+import getErrorMessage from '../lib/getErrorMessage';
 import { useAuthStore } from '../store/authStore';
 
 interface Flight {
@@ -104,8 +105,8 @@ export default function CheckoutPage() {
       setBooking(data);
       setPayFailed(false);
       setStep(2);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Could not hold this booking. Please try again.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not hold this booking. Please try again.'));
     } finally {
       setLoading(false);
     }

@@ -6,6 +6,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import Pill from '../components/Pill';
 import apiClient from '../lib/apiClient';
+import getErrorMessage from '../lib/getErrorMessage';
 import { useAuthStore } from '../store/authStore';
 
 interface Stats {
@@ -156,8 +157,8 @@ export default function AdminPage() {
       }
       setShowForm(false);
       refreshFlights();
-    } catch (err: any) {
-      setFareError(err.response?.data?.error || 'Could not save flight');
+    } catch (err) {
+      setFareError(getErrorMessage(err, 'Could not save flight'));
     }
   };
 
@@ -166,8 +167,8 @@ export default function AdminPage() {
     try {
       await apiClient.delete(`/admin/flights/${id}`);
       refreshFlights();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Could not delete flight');
+    } catch (err) {
+      alert(getErrorMessage(err, 'Could not delete flight'));
     }
   };
 
@@ -176,8 +177,8 @@ export default function AdminPage() {
     try {
       await apiClient.post(`/bookings/${id}/cancel`);
       setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status: 'cancelled' } : b)));
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Could not refund booking');
+    } catch (err) {
+      alert(getErrorMessage(err, 'Could not refund booking'));
     }
   };
 

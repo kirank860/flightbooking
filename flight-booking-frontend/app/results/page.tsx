@@ -6,6 +6,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import Pill from '../components/Pill';
 import apiClient from '../lib/apiClient';
+import getErrorMessage from '../lib/getErrorMessage';
 
 interface Flight {
   id: number;
@@ -69,9 +70,8 @@ export default function ResultsPage() {
         setOutbound((o) => ({ ...o, flights: data.flights, total: data.total }));
         setError('');
       })
-      .catch((err) => setError(err.response?.data?.error || 'Search failed'))
+      .catch((err) => setError(getErrorMessage(err, 'Search failed')))
       .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origin, destination, date, passengers, outbound.page]);
 
   useEffect(() => {
@@ -80,7 +80,6 @@ export default function ResultsPage() {
       .get('/flights/search', { params: { origin: destination, destination: origin, date: returnDate, passengerCount: passengers, page: inbound.page, limit } })
       .then(({ data }) => setInbound((i) => ({ ...i, flights: data.flights, total: data.total })))
       .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRoundTrip, origin, destination, returnDate, passengers, inbound.page]);
 
   const active = phase === 'outbound' ? outbound : inbound;

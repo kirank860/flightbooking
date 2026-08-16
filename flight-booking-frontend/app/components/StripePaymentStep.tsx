@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import apiClient from '../lib/apiClient';
+import getErrorMessage from '../lib/getErrorMessage';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -83,8 +84,8 @@ function PaymentForm({ clientSecret, booking, billingName, setError, onSuccess, 
       try {
         await apiClient.post('/payments/confirm', { bookingId: booking.id, paymentIntentId: paymentIntent.id });
         onSuccess(booking.id);
-      } catch (err: any) {
-        setError(err.response?.data?.error || 'Payment succeeded but we could not confirm the booking. It will finalize shortly.');
+      } catch (err) {
+        setError(getErrorMessage(err, 'Payment succeeded but we could not confirm the booking. It will finalize shortly.'));
         setPaying(false);
       }
       return;

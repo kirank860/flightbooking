@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -12,19 +12,23 @@ interface Slide {
 export default function HeroSlider({ slides }: { slides: Slide[] }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  const reducedMotion = useRef(false);
+  // State, not a ref, since it's read during render below (the transition
+  // duration) - a ref wouldn't trigger a re-render once matchMedia resolves,
+  // so the very first slide's fade-in would always ignore the user's actual
+  // reduced-motion preference.
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
-    reducedMotion.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }, []);
 
   useEffect(() => {
-    if (paused || reducedMotion.current) return;
+    if (paused || reducedMotion) return;
     const timer = setInterval(() => {
       setIndex((i) => (i + 1) % slides.length);
     }, 5500);
     return () => clearInterval(timer);
-  }, [paused, slides.length]);
+  }, [paused, reducedMotion, slides.length]);
 
   return (
     <div
@@ -40,7 +44,7 @@ export default function HeroSlider({ slides }: { slides: Slide[] }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: reducedMotion.current ? 0 : 0.9, ease: 'easeInOut' }}
+          transition={{ duration: reducedMotion ? 0 : 0.9, ease: 'easeInOut' }}
           className="absolute inset-0"
         >
           <Image

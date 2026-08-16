@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '../components/Header';
 import apiClient from '../lib/apiClient';
+import getErrorMessage from '../lib/getErrorMessage';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -29,8 +30,8 @@ export default function RegisterPage() {
       setEmail('');
       setPassword('');
       router.push('/login?registered=true');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }

@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { AxiosError } from 'axios';
 import Header from '../components/Header';
 import { useAuthStore } from '../store/authStore';
 import apiClient from '../lib/apiClient';
+import getErrorMessage from '../lib/getErrorMessage';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -37,11 +39,11 @@ export default function LoginPage() {
       const { data } = await apiClient.post('/auth/login', { email, password });
       setAuth(data.user, data.accessToken, data.refreshToken);
       window.location.href = redirect;
-    } catch (err: any) {
-      if (err.response?.status === 401) {
+    } catch (err) {
+      if (err instanceof AxiosError && err.response?.status === 401) {
         setCredentialsError('That email and password don’t match. Double-check your password and try again.');
       } else {
-        setCredentialsError(err.response?.data?.error || 'Something went wrong. Please try again.');
+        setCredentialsError(getErrorMessage(err, 'Something went wrong. Please try again.'));
       }
     } finally {
       setLoading(false);

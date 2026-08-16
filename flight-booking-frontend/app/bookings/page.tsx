@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { AxiosError } from 'axios';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import apiClient from '../lib/apiClient';
+import getErrorMessage from '../lib/getErrorMessage';
 import { useAuthStore } from '../store/authStore';
 
 interface Booking {
@@ -44,8 +46,8 @@ export default function BookingsPage() {
   useEffect(() => {
     apiClient.get('/bookings/my-bookings')
       .then(({ data }) => setBookings(data.bookings))
-      .catch((err: any) => {
-        if (err.response?.status === 401) {
+      .catch((err: unknown) => {
+        if (err instanceof AxiosError && err.response?.status === 401) {
           logout();
           router.push('/login');
         } else {
@@ -60,8 +62,8 @@ export default function BookingsPage() {
     try {
       const { data } = await apiClient.post(`/bookings/${bookingId}/cancel`);
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: data.booking.status } : b)));
-    } catch (err: any) {
-      setCancelErrors((prev) => ({ ...prev, [bookingId]: err.response?.data?.error || 'Could not cancel this booking.' }));
+    } catch (err) {
+      setCancelErrors((prev) => ({ ...prev, [bookingId]: getErrorMessage(err, 'Could not cancel this booking.') }));
     }
   };
 
