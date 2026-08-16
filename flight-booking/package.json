@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "install": "npm rebuild sqlite3 --build-from-source",
     "dev": "tsx watch src/server.ts",
     "seed": "tsx src/scripts/seedDatabase.ts",
     "start": "npm run seed && tsx src/server.ts",
