@@ -6,12 +6,16 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "seed": "tsx src/scripts/seedDatabase.ts",
+    "start": "npm run seed && tsx src/server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",

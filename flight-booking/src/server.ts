@@ -13,7 +13,9 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5001;
 
-app.use(cors());
+// Falls back to wide-open when FRONTEND_URL isn't set (local dev without a
+// .env entry for it) rather than failing closed.
+app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
 
 // Stripe signature verification needs the raw request body, so this must be
 // registered before the global express.json() parser below.
