@@ -14,6 +14,10 @@ interface Booking {
   origin: string;
   destination: string;
   departure_date: string;
+  return_airline?: string | null;
+  return_origin?: string | null;
+  return_destination?: string | null;
+  return_departure_date?: string | null;
   status: string;
   total_price: number;
   passenger_count: number;
@@ -107,6 +111,11 @@ export default function BookingsPage() {
                   <div className="text-sm text-ink-secondary leading-relaxed">
                     {booking.departure_date} &middot; {booking.airline} &middot; {booking.passenger_count} {booking.passenger_count > 1 ? 'passengers' : 'passenger'}
                   </div>
+                  {booking.return_origin && (
+                    <div className="text-sm text-ink-secondary leading-relaxed mt-1">
+                      Return: {booking.return_origin} → {booking.return_destination} &middot; {booking.return_departure_date} &middot; {booking.return_airline}
+                    </div>
+                  )}
                   <div className="text-[13px] text-ink-faint mt-1.5">Ref {reference(booking.id)} &middot; AED {booking.total_price}</div>
                 </div>
                 {booking.status === 'confirmed' && (

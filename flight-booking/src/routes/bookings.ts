@@ -9,12 +9,13 @@ const paymentService = new PaymentService();
 
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { flightId, passengers } = req.body;
+    const { flightId, passengers, returnFlightId } = req.body;
     const booking = await bookingService.createBooking(
       req.user!.userId,
       flightId,
       passengers.length,
-      passengers
+      passengers,
+      returnFlightId
     );
     res.status(201).json(booking);
   } catch (error: any) {

@@ -30,6 +30,7 @@ CREATE TABLE bookings (
   id SERIAL PRIMARY KEY,
   user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   flight_id INT NOT NULL REFERENCES flights(id),
+  return_flight_id INT REFERENCES flights(id),
   status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'cancelled')),
   total_price DECIMAL(10, 2) NOT NULL,
   stripe_payment_intent_id VARCHAR(255),

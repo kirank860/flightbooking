@@ -33,9 +33,15 @@ interface AdminBooking {
   user_email: string;
   origin: string;
   destination: string;
+  return_origin?: string | null;
+  return_destination?: string | null;
   created_at: string;
   total_price: number;
   status: string;
+}
+
+function routeLabel(b: AdminBooking) {
+  return b.return_origin ? `${b.origin}→${b.destination} / ${b.return_origin}→${b.return_destination}` : `${b.origin}→${b.destination}`;
 }
 
 const emptyFlightForm = {
@@ -232,7 +238,7 @@ export default function AdminPage() {
                     <div key={r.id} className="grid grid-cols-[1fr_1.4fr_1fr_0.9fr_0.8fr] gap-3.5 items-center text-sm py-3 border-t border-border-row">
                       <span className="font-mono text-[13px] text-ink-secondary">AG-{String(r.id).padStart(6, '0')}</span>
                       <span>{r.user_email}</span>
-                      <span className="text-ink-secondary">{r.origin}→{r.destination}</span>
+                      <span className="text-ink-secondary">{routeLabel(r)}</span>
                       <span>AED {r.total_price}</span>
                       <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs w-fit capitalize ${chipClass(r.status)}`}>{r.status.replace('_', ' ')}</span>
                     </div>
@@ -339,7 +345,7 @@ export default function AdminPage() {
                   <div key={b.id} className="grid grid-cols-[1fr_1.3fr_1fr_1fr_0.9fr_1.1fr] gap-3.5 items-center text-sm py-3 border-t border-border-row">
                     <span className="font-mono text-[13px] text-ink-secondary">AG-{String(b.id).padStart(6, '0')}</span>
                     <span>{b.user_email}</span>
-                    <span className="text-ink-secondary">{b.origin}→{b.destination}</span>
+                    <span className="text-ink-secondary">{routeLabel(b)}</span>
                     <span className="text-ink-secondary">{b.created_at.slice(0, 10)}</span>
                     <span>AED {b.total_price}</span>
                     <span className="flex items-center gap-3 flex-wrap">

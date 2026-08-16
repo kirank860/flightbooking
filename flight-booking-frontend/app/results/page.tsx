@@ -20,6 +20,14 @@ interface Flight {
   total_seats: number;
 }
 
+interface LegState {
+  flights: Flight[];
+  total: number;
+  page: number;
+}
+
+const EMPTY_LEG: LegState = { flights: [], total: 0, page: 1 };
+
 function duration(dep: string, arr: string) {
   const [dh, dm] = dep.split(':').map(Number);
   const [ah, am] = arr.split(':').map(Number);
@@ -36,11 +44,16 @@ export default function ResultsPage() {
   const origin = (searchParams.get('origin') || '').toUpperCase();
   const destination = (searchParams.get('destination') || '').toUpperCase();
   const date = searchParams.get('date') || '';
+  const returnDate = searchParams.get('returnDate') || '';
+  const isRoundTrip = Boolean(returnDate);
   const passengers = parseInt(searchParams.get('passengers') || '1');
 
-  const [flights, setFlights] = useState<Flight[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [phase, setPhase] = useState<'outbound' | 'return'>('outbound');
+  const [selectedOutbound, setSelectedOutbound] = useState<Flight | null>(null);
+
+  const [outbound, setOutbound] = useState<LegState>(EMPTY_LEG);
+  const [inbound, setInbound] = useState<LegState>(EMPTY_LEG);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sort, setSort] = useState<'Cheapest' | 'Earliest'>('Cheapest');
@@ -51,28 +64,60 @@ export default function ResultsPage() {
     if (!origin || !destination || !date) return;
     setLoading(true);
     apiClient
-      .get('/flights/search', { params: { origin, destination, date, passengerCount: passengers, page, limit } })
+      .get('/flights/search', { params: { origin, destination, date, passengerCount: passengers, page: outbound.page, limit } })
       .then(({ data }) => {
-        setFlights(data.flights);
-        setTotal(data.total);
+        setOutbound((o) => ({ ...o, flights: data.flights, total: data.total }));
         setError('');
       })
       .catch((err) => setError(err.response?.data?.error || 'Search failed'))
       .finally(() => setLoading(false));
-  }, [origin, destination, date, passengers, page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origin, destination, date, passengers, outbound.page]);
+
+  useEffect(() => {
+    if (!isRoundTrip || !origin || !destination || !returnDate) return;
+    apiClient
+      .get('/flights/search', { params: { origin: destination, destination: origin, date: returnDate, passengerCount: passengers, page: inbound.page, limit } })
+      .then(({ data }) => setInbound((i) => ({ ...i, flights: data.flights, total: data.total })))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRoundTrip, origin, destination, returnDate, passengers, inbound.page]);
+
+  const active = phase === 'outbound' ? outbound : inbound;
+  const activeLoading = phase === 'outbound' && loading;
 
   const list = useMemo(() => {
-    return flights
+    return active.flights
       .filter((f) => f.price <= maxPrice)
       .slice()
       .sort((a, b) => (sort === 'Cheapest' ? a.price - b.price : a.departure_time.localeCompare(b.departure_time)));
-  }, [flights, maxPrice, sort]);
+  }, [active.flights, maxPrice, sort]);
 
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const totalPages = Math.max(1, Math.ceil(active.total / limit));
 
-  const openFlight = (id: number) => {
-    router.push(`/flights/${id}?passengers=${passengers}`);
+  const selectFlight = (f: Flight) => {
+    if (!isRoundTrip) {
+      router.push(`/flights/${f.id}?passengers=${passengers}`);
+      return;
+    }
+    if (phase === 'outbound') {
+      setSelectedOutbound(f);
+      setPhase('return');
+      return;
+    }
+    router.push(`/checkout?flightId=${selectedOutbound!.id}&returnFlightId=${f.id}&passengerCount=${passengers}`);
   };
+
+  const setPage = (updater: (p: number) => number) => {
+    if (phase === 'outbound') {
+      setOutbound((o) => ({ ...o, page: updater(o.page) }));
+    } else {
+      setInbound((i) => ({ ...i, page: updater(i.page) }));
+    }
+  };
+
+  const routeLabel = phase === 'outbound' ? `${origin} → ${destination}` : `${destination} → ${origin}`;
+  const dateLabel = phase === 'outbound' ? date : returnDate;
 
   return (
     <div className="min-h-screen flex flex-col bg-page">
@@ -80,16 +125,37 @@ export default function ResultsPage() {
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-8 lg:px-14 py-5 sm:py-9 pb-16">
         <div className="flex items-center justify-between gap-4 flex-wrap bg-surface border border-border rounded-2xl px-5 py-4">
           <div>
-            <div className="font-serif text-[clamp(22px,3vw,30px)] tracking-[-0.01em]">{origin} → {destination}</div>
-            <div className="text-[13px] text-ink-muted mt-1">{date || 'Any date'} &middot; {passengers} {passengers > 1 ? 'passengers' : 'passenger'}</div>
+            {isRoundTrip && (
+              <div className="text-[13px] text-accent tracking-[0.06em] uppercase mb-1">
+                {phase === 'outbound' ? 'Step 1 — outbound flight' : 'Step 2 — return flight'}
+              </div>
+            )}
+            <div className="font-serif text-[clamp(22px,3vw,30px)] tracking-[-0.01em]">{routeLabel}</div>
+            <div className="text-[13px] text-ink-muted mt-1">{dateLabel || 'Any date'} &middot; {passengers} {passengers > 1 ? 'passengers' : 'passenger'}</div>
           </div>
-          <button
-            onClick={() => router.push('/')}
-            className="border border-ink bg-transparent rounded-full px-5 py-2.5 text-sm cursor-pointer min-h-[44px] hover:bg-ink hover:text-page transition-colors"
-          >
-            Edit search
-          </button>
+          {isRoundTrip && phase === 'return' ? (
+            <button
+              onClick={() => setPhase('outbound')}
+              className="border border-ink bg-transparent rounded-full px-5 py-2.5 text-sm cursor-pointer min-h-[44px] hover:bg-ink hover:text-page transition-colors"
+            >
+              ← Change outbound flight
+            </button>
+          ) : (
+            <button
+              onClick={() => router.push('/')}
+              className="border border-ink bg-transparent rounded-full px-5 py-2.5 text-sm cursor-pointer min-h-[44px] hover:bg-ink hover:text-page transition-colors"
+            >
+              Edit search
+            </button>
+          )}
         </div>
+
+        {isRoundTrip && phase === 'return' && selectedOutbound && (
+          <div className="flex items-center gap-3 flex-wrap mt-3 bg-accent-tint border border-accent/20 rounded-2xl px-5 py-3.5 text-sm">
+            <span className="text-accent">Outbound selected:</span>
+            <span>{origin} → {destination} &middot; {selectedOutbound.departure_time}–{selectedOutbound.arrival_time} &middot; {selectedOutbound.airline} &middot; AED {selectedOutbound.price}</span>
+          </div>
+        )}
 
         <div className="flex gap-5 flex-wrap mt-5 items-start">
           <aside className="flex-1 min-w-[240px] max-w-[320px] bg-surface border border-border rounded-2xl p-5">
@@ -113,18 +179,18 @@ export default function ResultsPage() {
           </aside>
 
           <section className="flex-[3] min-w-[min(100%,320px)] flex flex-col gap-3">
-            {error && (
+            {error && phase === 'outbound' && (
               <div className="border border-danger-border bg-danger-bg text-danger-body rounded-2xl p-6 text-sm">{error}</div>
             )}
-            {!error && !loading && (
-              <div className="text-sm text-ink-muted">{list.length} of {total} flights &middot; sorted by {sort.toLowerCase()}</div>
+            {!(error && phase === 'outbound') && !activeLoading && (
+              <div className="text-sm text-ink-muted">{list.length} of {active.total} flights &middot; sorted by {sort.toLowerCase()}</div>
             )}
-            {loading && <div className="text-sm text-ink-muted">Searching…</div>}
+            {activeLoading && <div className="text-sm text-ink-muted">Searching…</div>}
 
-            {!loading && list.map((f) => (
+            {!activeLoading && list.map((f) => (
               <article
                 key={f.id}
-                onClick={() => openFlight(f.id)}
+                onClick={() => selectFlight(f)}
                 className="bg-surface border border-border rounded-2xl px-5 py-[18px] flex gap-5 flex-wrap items-center justify-between cursor-pointer hover:border-accent transition-colors"
               >
                 <div className="flex items-center gap-4 flex-1 min-w-[200px]">
@@ -149,25 +215,25 @@ export default function ResultsPage() {
               </article>
             ))}
 
-            {!loading && !error && list.length === 0 && (
+            {!activeLoading && !(error && phase === 'outbound') && list.length === 0 && (
               <div className="border border-dashed border-[#D6CFC3] rounded-2xl p-10 text-center text-ink-muted text-[15px]">
                 No flights under that price. Try widening the max price filter or a different date.
               </div>
             )}
 
-            {!loading && total > limit && (
+            {!activeLoading && active.total > limit && (
               <div className="flex items-center justify-between gap-3 flex-wrap pt-2">
-                <span className="text-[13px] text-ink-muted">Page {page} of {totalPages}</span>
+                <span className="text-[13px] text-ink-muted">Page {active.page} of {totalPages}</span>
                 <div className="flex gap-2">
                   <button
-                    disabled={page <= 1}
+                    disabled={active.page <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     className="border border-border-input text-ink-secondary rounded-full px-4 py-2.5 text-sm min-h-[44px] flex items-center disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:border-accent transition-colors"
                   >
                     Previous
                   </button>
                   <button
-                    disabled={page >= totalPages}
+                    disabled={active.page >= totalPages}
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     className="border border-ink rounded-full px-4 py-2.5 text-sm cursor-pointer min-h-[44px] flex items-center disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:bg-ink hover:enabled:text-page transition-colors"
                   >

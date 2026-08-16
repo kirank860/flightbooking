@@ -168,13 +168,15 @@ const db = new sqlite3.Database(dbPath, async (err) => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         flight_id INTEGER NOT NULL,
+        return_flight_id INTEGER,
         status TEXT NOT NULL,
         total_price REAL NOT NULL,
         stripe_payment_intent_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id),
-        FOREIGN KEY (flight_id) REFERENCES flights (id)
+        FOREIGN KEY (flight_id) REFERENCES flights (id),
+        FOREIGN KEY (return_flight_id) REFERENCES flights (id)
       )
     `);
 

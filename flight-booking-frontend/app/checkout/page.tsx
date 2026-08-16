@@ -43,17 +43,19 @@ export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const flightId = searchParams.get('flightId');
+  const returnFlightId = searchParams.get('returnFlightId');
   const passengerCount = parseInt(searchParams.get('passengerCount') || '1');
   const { user, initializing } = useAuthStore();
 
   useEffect(() => {
     if (!initializing && !user) {
-      const redirect = `/checkout?flightId=${flightId}&passengerCount=${passengerCount}`;
+      const redirect = `/checkout?flightId=${flightId}${returnFlightId ? `&returnFlightId=${returnFlightId}` : ''}&passengerCount=${passengerCount}`;
       router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
     }
-  }, [initializing, user, router, flightId, passengerCount]);
+  }, [initializing, user, router, flightId, returnFlightId, passengerCount]);
 
   const [flight, setFlight] = useState<Flight | null>(null);
+  const [returnFlight, setReturnFlight] = useState<Flight | null>(null);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -72,6 +74,13 @@ export default function CheckoutPage() {
       .catch(() => setError('Failed to load flight details'));
   }, [flightId]);
 
+  useEffect(() => {
+    if (!returnFlightId) return;
+    apiClient.get(`/flights/${returnFlightId}`)
+      .then(({ data }) => setReturnFlight(data))
+      .catch(() => setError('Failed to load return flight details'));
+  }, [returnFlightId]);
+
   const updatePassenger = (index: number, field: keyof Passenger, value: string) => {
     const updated = [...passengers];
     updated[index] = { ...updated[index], [field]: value };
@@ -87,7 +96,11 @@ export default function CheckoutPage() {
     setError('');
     setLoading(true);
     try {
-      const { data } = await apiClient.post('/bookings', { flightId: parseInt(flightId!), passengers });
+      const { data } = await apiClient.post('/bookings', {
+        flightId: parseInt(flightId!),
+        passengers,
+        ...(returnFlightId ? { returnFlightId: parseInt(returnFlightId) } : {}),
+      });
       setBooking(data);
       setPayFailed(false);
       setStep(2);
@@ -107,7 +120,7 @@ export default function CheckoutPage() {
     setBooking(null);
   };
 
-  if (initializing || !user || !flight) {
+  if (initializing || !user || !flight || (returnFlightId && !returnFlight)) {
     return (
       <div className="min-h-screen flex flex-col bg-page">
         <Header />
@@ -119,7 +132,7 @@ export default function CheckoutPage() {
     );
   }
 
-  const total = booking?.total_price ?? flight.price * passengerCount;
+  const total = booking?.total_price ?? (flight.price + (returnFlight?.price ?? 0)) * passengerCount;
 
   return (
     <div className="min-h-screen flex flex-col bg-page">
@@ -176,9 +189,15 @@ export default function CheckoutPage() {
             </section>
 
             <aside className="flex-1 min-w-[260px] sticky top-24 bg-surface border border-border rounded-[20px] p-6">
-              <div className="text-xs tracking-[0.12em] uppercase text-ink-muted mb-3.5">Your flight</div>
+              <div className="text-xs tracking-[0.12em] uppercase text-ink-muted mb-3.5">{returnFlight ? 'Your trip' : 'Your flight'}</div>
               <div className="text-[17px] mb-1">{flight.origin} → {flight.destination}</div>
               <div className="text-[13px] text-ink-muted mb-5">{flight.airline} &middot; {flight.departure_date}</div>
+              {returnFlight && (
+                <>
+                  <div className="text-[17px] mb-1">{returnFlight.origin} → {returnFlight.destination}</div>
+                  <div className="text-[13px] text-ink-muted mb-5">{returnFlight.airline} &middot; {returnFlight.departure_date}</div>
+                </>
+              )}
               <div className="border-t border-border pt-4.5 pt-[18px] flex justify-between items-baseline gap-3 mb-4.5 mb-[18px]">
                 <span className="text-[15px]">Total</span>
                 <span className="font-serif text-[30px]">AED {total}</span>
@@ -198,6 +217,7 @@ export default function CheckoutPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <StripePaymentStep
               flight={flight}
+              returnFlight={returnFlight}
               booking={booking}
               passengerCount={passengerCount}
               billingName={passengers[0]?.full_name || ''}

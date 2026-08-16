@@ -15,6 +15,9 @@ interface Booking {
   origin: string;
   destination: string;
   departure_date: string;
+  return_origin?: string | null;
+  return_destination?: string | null;
+  return_departure_date?: string | null;
   passenger_count: number;
 }
 
@@ -76,13 +79,25 @@ export default function ConfirmationPage() {
 
                 <div className="bg-surface border border-border rounded-[20px] p-6 text-left grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
                   <div>
-                    <div className={labelClass}>Route</div>
+                    <div className={labelClass}>{booking.return_origin ? 'Outbound' : 'Route'}</div>
                     <div className="text-base mt-1.5">{booking.origin} → {booking.destination}</div>
                   </div>
                   <div>
                     <div className={labelClass}>Departs</div>
                     <div className="text-base mt-1.5">{booking.departure_date}</div>
                   </div>
+                  {booking.return_origin && (
+                    <>
+                      <div>
+                        <div className={labelClass}>Return</div>
+                        <div className="text-base mt-1.5">{booking.return_origin} → {booking.return_destination}</div>
+                      </div>
+                      <div>
+                        <div className={labelClass}>Returns</div>
+                        <div className="text-base mt-1.5">{booking.return_departure_date}</div>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <div className={labelClass}>Passengers</div>
                     <div className="text-base mt-1.5">{booking.passenger_count}</div>

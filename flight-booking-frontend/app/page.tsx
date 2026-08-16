@@ -82,6 +82,9 @@ export default function Home() {
       date: depart,
       passengers: String(pax),
     });
+    if (tripType === 'Round trip' && ret) {
+      params.set('returnDate', ret);
+    }
     router.push(`/results?${params.toString()}`);
   };
 
@@ -169,7 +172,9 @@ export default function Home() {
                     type="date"
                     value={ret}
                     onChange={(e) => setRet(e.target.value)}
+                    min={depart || undefined}
                     className="border border-border-input rounded-xl px-[15px] py-3.5 text-base bg-input outline-none focus:border-accent transition-colors"
+                    required={tripType === 'Round trip'}
                   />
                 </label>
               )}

@@ -35,6 +35,7 @@ interface Booking {
 
 interface Props {
   flight: Flight;
+  returnFlight?: Flight | null;
   booking: Booking;
   passengerCount: number;
   billingName: string;
@@ -118,7 +119,7 @@ function PaymentForm({ clientSecret, booking, billingName, setError, onSuccess, 
   );
 }
 
-export default function StripePaymentStep({ flight, booking, passengerCount, billingName, setError, onSuccess, onDecline }: Props) {
+export default function StripePaymentStep({ flight, returnFlight, booking, passengerCount, billingName, setError, onSuccess, onDecline }: Props) {
   const [clientSecret, setClientSecret] = useState('');
   const [loadError, setLoadError] = useState('');
 
@@ -159,7 +160,14 @@ export default function StripePaymentStep({ flight, booking, passengerCount, bil
       <aside className="flex-1 min-w-[260px] sticky top-24 bg-surface border border-border rounded-[20px] p-6">
         <div className="text-xs tracking-[0.12em] uppercase text-ink-muted mb-3.5">Order</div>
         <div className="text-[17px] mb-1">{flight.origin} → {flight.destination}</div>
-        <div className="text-[13px] text-ink-muted mb-4.5 mb-[18px]">{passengerCount} {passengerCount > 1 ? 'passengers' : 'passenger'} &middot; {flight.departure_date}</div>
+        <div className="text-[13px] text-ink-muted mb-2.5">{flight.departure_date}</div>
+        {returnFlight && (
+          <>
+            <div className="text-[17px] mb-1">{returnFlight.origin} → {returnFlight.destination}</div>
+            <div className="text-[13px] text-ink-muted mb-2.5">{returnFlight.departure_date}</div>
+          </>
+        )}
+        <div className="text-[13px] text-ink-muted mb-4.5 mb-[18px]">{passengerCount} {passengerCount > 1 ? 'passengers' : 'passenger'}</div>
         <div className="flex flex-col gap-2.5 text-[15px] border-t border-border pt-4">
           <div className="flex justify-between gap-3"><span className="text-ink-secondary">Fare &times; {passengerCount}</span><span>AED {booking.total_price}</span></div>
           <div className="flex justify-between gap-3"><span className="text-ink-secondary">Taxes &amp; fees</span><span>Included</span></div>

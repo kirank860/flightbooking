@@ -8,11 +8,18 @@ export class BookingService {
     userId: number,
     flightId: number,
     passengerCount: number,
-    passengers: any[]
+    passengers: any[],
+    returnFlightId?: number
   ) {
     const flight = await flightService.getFlightById(flightId);
     if (!flight) {
       throw new Error('Flight not found');
+    }
+    if (returnFlightId) {
+      const returnFlight = await flightService.getFlightById(returnFlightId);
+      if (!returnFlight) {
+        throw new Error('Return flight not found');
+      }
     }
 
     // decrementSeats does a single atomic UPDATE guarded by the same WHERE
@@ -24,14 +31,27 @@ export class BookingService {
     // connection with no real per-request isolation; concurrent requests
     // collided and every single one failed.)
     const decremented = await flightService.decrementSeats(flightId, passengerCount);
+    let returnPrice = 0;
+
+    if (returnFlightId) {
+      try {
+        const returnDecremented = await flightService.decrementSeats(returnFlightId, passengerCount);
+        returnPrice = returnDecremented.price;
+      } catch (error) {
+        // Return leg couldn't be held - give back the outbound seats already claimed.
+        await flightService.incrementSeats(flightId, passengerCount);
+        throw error;
+      }
+    }
+
     const price = decremented.price;
 
     try {
       const bookingResult = await pool.query(
-        `INSERT INTO bookings (user_id, flight_id, status, total_price)
-         VALUES ($1, $2, 'pending', $3)
+        `INSERT INTO bookings (user_id, flight_id, return_flight_id, status, total_price)
+         VALUES ($1, $2, $3, 'pending', $4)
          RETURNING *`,
-        [userId, flightId, price * passengerCount]
+        [userId, flightId, returnFlightId ?? null, (price + returnPrice) * passengerCount]
       );
 
       const booking = bookingResult.rows[0];
@@ -55,9 +75,12 @@ export class BookingService {
 
       return booking;
     } catch (error) {
-      // Booking/passenger insert failed after the seat was already claimed —
-      // give it back rather than leaking it.
+      // Booking/passenger insert failed after the seats were already claimed —
+      // give them back rather than leaking them.
       await flightService.incrementSeats(flightId, passengerCount);
+      if (returnFlightId) {
+        await flightService.incrementSeats(returnFlightId, passengerCount);
+      }
       throw error;
     }
   }
@@ -112,7 +135,7 @@ export class BookingService {
     }
 
     const booking = result.rows[0];
-    await this.releaseSeats(booking.id, booking.flight_id);
+    await this.releaseSeats(booking);
     return booking;
   }
 
@@ -153,20 +176,21 @@ export class BookingService {
     );
 
     const updated = result.rows[0];
-    await this.releaseSeats(updated.id, updated.flight_id);
+    await this.releaseSeats(updated);
     return updated;
   }
 
-  private async releaseSeats(bookingId: number, flightId: number) {
+  private async releaseSeats(booking: { id: number; flight_id: number; return_flight_id: number | null }) {
     const passengers = await pool.query(
       'SELECT COUNT(*) as count FROM passengers WHERE booking_id = $1',
-      [bookingId]
+      [booking.id]
     );
+    const count = parseInt(passengers.rows[0].count);
 
-    await flightService.incrementSeats(
-      flightId,
-      parseInt(passengers.rows[0].count)
-    );
+    await flightService.incrementSeats(booking.flight_id, count);
+    if (booking.return_flight_id) {
+      await flightService.incrementSeats(booking.return_flight_id, count);
+    }
   }
 
   async getUserBookings(userId: number, page: number = 1, limit: number = 10) {
@@ -174,9 +198,12 @@ export class BookingService {
 
     const result = await pool.query(
       `SELECT b.*, f.airline, f.origin, f.destination, f.departure_date, f.departure_time,
+              rf.airline as return_airline, rf.origin as return_origin, rf.destination as return_destination,
+              rf.departure_date as return_departure_date, rf.departure_time as return_departure_time,
               (SELECT COUNT(*) FROM passengers p WHERE p.booking_id = b.id) as passenger_count
        FROM bookings b
        JOIN flights f ON b.flight_id = f.id
+       LEFT JOIN flights rf ON b.return_flight_id = rf.id
        WHERE b.user_id = $1
        ORDER BY b.created_at DESC
        LIMIT $2 OFFSET $3`,
@@ -216,10 +243,12 @@ export class BookingService {
 
     const rowsResult = await pool.query(
       `SELECT b.*, f.airline, f.origin, f.destination, f.departure_date,
+              rf.origin as return_origin, rf.destination as return_destination,
               u.email as user_email,
               (SELECT COUNT(*) FROM passengers p WHERE p.booking_id = b.id) as passenger_count
        FROM bookings b
        JOIN flights f ON b.flight_id = f.id
+       LEFT JOIN flights rf ON b.return_flight_id = rf.id
        JOIN users u ON b.user_id = u.id
        ${where}
        ORDER BY b.created_at DESC
