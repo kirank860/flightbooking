@@ -42,7 +42,3 @@ body {
 ::placeholder {
   color: var(--color-ink-faint);
 }
-
-.placeholder-fill {
-  background-image: repeating-linear-gradient(135deg, #EFEAE1 0 8px, #F6F2EB 8px 16px);
-}
