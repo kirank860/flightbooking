@@ -25,7 +25,17 @@ function reference(id: number) {
   return `AG-${String(id).padStart(6, '0')}`;
 }
 
+import { Suspense } from 'react';
+
 export default function ConfirmationPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-ink-muted">Loading...</div>}>
+      <ConfirmationContent />
+    </Suspense>
+  );
+}
+
+function ConfirmationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const bookingId = searchParams.get('bookingId');

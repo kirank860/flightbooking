@@ -33,7 +33,17 @@ function flightCode(f: Flight) {
   return `${f.airline.slice(0, 2).toUpperCase()} ${String(f.id).padStart(3, '0')}`;
 }
 
+import { Suspense } from 'react';
+
 export default function FlightDetailPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-ink-muted">Loading...</div>}>
+      <FlightDetailContent />
+    </Suspense>
+  );
+}
+
+function FlightDetailContent() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();

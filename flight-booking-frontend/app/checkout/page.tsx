@@ -40,7 +40,17 @@ interface Booking {
 const inputClass = 'border border-border-input rounded-xl px-[15px] py-3.5 text-base bg-input outline-none focus:border-accent transition-colors w-full';
 const labelClass = 'text-xs tracking-[0.1em] uppercase text-ink-muted';
 
+import { Suspense } from 'react';
+
 export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-ink-muted">Loading...</div>}>
+      <CheckoutContent />
+    </Suspense>
+  );
+}
+
+function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const flightId = searchParams.get('flightId');

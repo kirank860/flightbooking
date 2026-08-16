@@ -11,7 +11,17 @@ import getErrorMessage from '../lib/getErrorMessage';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+import { Suspense } from 'react';
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-ink-muted">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
   const [email, setEmail] = useState('');

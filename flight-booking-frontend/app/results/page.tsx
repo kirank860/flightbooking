@@ -39,7 +39,17 @@ function duration(dep: string, arr: string) {
   return `${h}h ${m.toString().padStart(2, '0')}m`;
 }
 
+import { Suspense } from 'react';
+
 export default function ResultsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-ink-muted">Loading...</div>}>
+      <ResultsContent />
+    </Suspense>
+  );
+}
+
+function ResultsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const origin = (searchParams.get('origin') || '').toUpperCase();
